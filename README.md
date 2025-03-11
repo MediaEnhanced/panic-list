@@ -15,7 +15,7 @@ rustup component add rust-src --toolchain nightly
 
 This program is not currently published to [crates.io](https://crates.io/) but can be installed by running:
 
-`cargo install --git https://github.com/MediaEnhanced/panic-list.git panic-list`
+`cargo install --git https://github.com/MediaEnhanced/panic-list.git`
 
 To generate the panic-list for a Rust library crate package, change directory into the Cargo root for the library and then execute the command:
 
@@ -143,7 +143,7 @@ plel::print_hello_world
 ```
 </details>
 Notice all of the possible panics that occur by calling Rust's std::println! macro.
-
+<br>
 <br>
 Note that because of the feature limitation explained above the `-C` flag should be added when executing either of these commands if the other command was run previously.
 
@@ -156,7 +156,7 @@ cargo print-panic-list-for-example-lib-no-default
 Some basic Rust library tests with this tool:
 
 <br>
-Current demangle panic-list feature [dependency](https://github.com/rust-lang/rustc-demangle):
+Current demangle panic-list feature [dependency](https://github.com/rust-lang/rustc-demangle)
 <details>
 <summary><code>panic-list rustc-demangle</code></summary>
 
@@ -165,7 +165,7 @@ No panics found! Create a staticlib library output to analyze for true panic-fre
 ```
 </details>
 Supposedly no-panics
-
+<br>
 <br>
 Popular Data Structures Library: [Hasbrown](https://github.com/rust-lang/hashbrown) (commit b5b0655 | tested on 2025-3-11)
 <details>
@@ -178,7 +178,7 @@ hashbrown::raw::Fallibility::capacity_overflow
 ```
 </details>
 This seems to indicate that for a release version of default-featured hashbrown there is ONE panic call that keeps the whole panic handler system in the code...
-
+<br>
 <br>
 Popular Data Encoding Library: [base64 v0.22.1](https://github.com/marshallpierce/rust-base64/tree/v0.22.1)
 <details>
@@ -212,7 +212,7 @@ base64::alphabet::Alphabet::as_str
 ```
 </details>
 Could manually ensure that slice indices are not out of bounds and propagate an error up to remove some of the panics.
-
+<br>
 <br>
 Note that most release profiles are compiled to NOT panic on overflow cutting out list-able panics and creates undesigned behavior /potential bugs if overflow ends up occurring.
 
