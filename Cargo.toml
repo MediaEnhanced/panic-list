@@ -1,0 +1,130 @@
+# Media Enhanced panic-list Cargo
+# Useful for creating a list of library functions that
+# could panic so they can be modified to become panic-free!
+
+[package]
+name = "panic-list"
+version = "0.1.0"
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "creates a panic-list of a library"
+# Draft Keywords
+keywords = [
+    "panic",
+    "no-panic",
+    "panic-possible",
+    "panic-free",
+    "panic-handler",
+]
+# No Appropriate Categories (category slugs)
+categories = []
+
+edition.workspace = true
+rust-version.workspace = true
+
+default-run = "panic-list"
+
+build = false
+# Disable Automatic Discovery
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+# Publish In Future
+publish = false
+# include | exclude here in future
+
+[workspace]
+members = ["examples/lib"]
+# Only Root Package Is Used
+#default-members = []
+resolver = "3"
+
+[workspace.package]
+authors = ["MediaEnhanced"]
+repository = "https://github.com/MediaEnhanced/panic-list"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+edition = "2024"
+rust-version = "1.85"
+
+# General Rust Lints 
+[workspace.lints.rust]
+missing_docs = "forbid"
+unsafe_code = "deny"
+unreachable_pub = "warn"
+single_use_lifetimes = "warn"
+
+# Extra Clippy Lints
+[workspace.lints.clippy]
+missing_docs_in_private_items = "warn"
+
+[[bin]]
+name = "panic-list"
+path = "src/main.rs"
+# No Documentation Yet
+doc = false
+# No Testing Yet
+test = false
+doctest = false
+bench = false
+harness = false
+
+
+# Development (Quick) Building Profile
+[profile.dev]
+opt-level = 1
+debug = true
+#split-debuginfo = '...'  # Platform-specific.
+strip = false
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 256
+rpath = false
+
+# Release (Slow) Building Profile
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+debug-assertions = false
+overflow-checks = false
+lto = true               #"fat" LTO
+panic = 'abort'
+incremental = true
+codegen-units = 1        #"fat" LTO still operates
+rpath = false
+
+[profile.release-overflow]
+inherits = "release"
+overflow-checks = true
+
+[profile.test]
+opt-level = 3
+debug = false
+strip = true
+debug-assertions = false
+overflow-checks = true
+lto = true               #"fat" LTO
+panic = 'abort'
+incremental = true
+codegen-units = 1        #"fat" LTO still operates
+rpath = false
+
+[dependencies]
+# Argument parsing
+bpaf = { version = "0.9", features = ["derive"], optional = true }
+# Demangler
+rustc-demangle = { version = "0.1", default-features = false, optional = true }
+
+[features]
+arg-parser = ["dep:bpaf"]
+demangle = ["dep:rustc-demangle"]
+std = []
+default = ["std", "arg-parser", "demangle"]

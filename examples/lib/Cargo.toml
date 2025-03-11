@@ -1,0 +1,59 @@
+# Media Enhanced panic-list example library (plel) Cargo
+# Used for demonstrating the main capabilities of
+# the panic-list Rust binary
+
+[package]
+name = "plel"
+version = "0.1.0"
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "perform basic operations that either could or won't panic"
+# Some Vague Keywords
+keywords = ["basic-operations", "panic-possible", "panic-free", "example-lib"]
+# No Appropriate Categories (category slugs)
+categories = []
+
+edition.workspace = true
+rust-version.workspace = true
+
+# No Build File
+build = false
+
+# Disable Automatic Discovery
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+# Nothing to Publish
+publish = false
+# Noinclude | exclude here in future
+
+# General Rust Lints 
+[lints]
+workspace = true
+
+[lib]
+# Unnecessary name definition since it matches the package name
+#name = "plel"
+path = "src/lib.rs"
+# Rust Static Library:
+crate-type = ["rlib"]
+# No Documentation Yet
+doc = false
+# No Testing
+test = false
+doctest = false
+bench = false
+harness = false
+# Not a proc-macro library
+proc-macro = false
+
+# No External Dependencies
+
+[features]
+panic-possible = []
+std = []
+default = ["std", "panic-possible"]
