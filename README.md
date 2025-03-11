@@ -45,7 +45,7 @@ A panic-list example library (plel) is included in this source [here](examples/l
 
 No Rust standard library `#![no_std]` and overflows WILL panic:
 <details>
-<summary>`cargo print-panic-list-for-example-lib-no-std`</summary>
+<summary><code>cargo print-panic-list-for-example-lib-no-std</code></summary>
 
 ```
 plel::possible::slice_byte
@@ -68,7 +68,7 @@ plel::possible::div
 
 Include Rust Standard Library (std) and overflows DO NOT panic:
 <details>
-<summary>`cargo write-panic-list-for-example-lib`</summary>
+<summary><code>cargo write-panic-list-for-example-lib</code></summary>
 
 ```
 plel::possible::slice_byte
@@ -153,7 +153,7 @@ cargo print-panic-list-for-example-lib-no-default
 ### Rust Library Test Outputs
 Current demangle panic-list feature [dependency](https://github.com/rust-lang/rustc-demangle):
 <details>
-<summary>`panic-list rustc-demangle`</summary>
+<summary><code>panic-list rustc-demangle</code></summary>
 
 ```
 No panics found! Create a staticlib library output to analyze for true panic-freeness.
@@ -163,7 +163,7 @@ Supposedly no-panics
 
 Popular Data Structures Library: [Hasbrown](https://github.com/rust-lang/hashbrown) (commit b5b0655 | tested on 2025-3-11)
 <details>
-<summary>`panic-list hasbrown`</summary>
+<summary><code>panic-list hasbrown</code></summary>
 
 ```
 hashbrown::raw::Fallibility::capacity_overflow
@@ -175,7 +175,7 @@ This seems to indicate that for a release version of default-featured hashbrown 
 
 Popular Data Encoding Library: [base64 v0.22.1](https://github.com/marshallpierce/rust-base64/tree/v0.22.1)
 <details>
-<summary>`panic-list base64`</summary>
+<summary><code>panic-list base64</code></summary>
 
 ```
 <base64::chunked_encoder::StringSink as base64::chunked_encoder::Sink>::write_encoded_bytes

@@ -1,0 +1,9 @@
+# Media Enhanced panic-list Cargo Configuration
+
+# Usefull Cargo Command Aliases
+[alias]
+show-help = "run --release -- --help"
+write-panic-list-for-example-lib = "run --release -- -o panic-list.txt -w plel"
+print-panic-list-for-example-lib-no-std = "run --release -- -d --features=panic-possible -c --profile=release-overflow -w plel"
+print-panic-list-for-example-lib-no-default = "run --release -- -d --profile=release-overflow -c -w plel"
+clean-profile-release-overflow = "clean --profile=release-overflow"
