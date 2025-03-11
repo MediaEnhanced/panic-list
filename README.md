@@ -38,11 +38,12 @@ No changes have to be made to the analyzed library Cargo.toml and it will use th
 
 I wrote this after wanting to remove as many panics as possible from a no-std library I am developing that always leaves overflow-checks on (even with the release profile). These checks add even more ways that code can panic wherever a mathematical overflow can happen. I was unsatisfied with the lack of options/tools that exist to make finding all possible panics a reasonable task and after stumbling upon [No-Panic Rust](https://blog.reverberate.org/2025/02/03/no-panic-rust.html) during research, I was finally inspired to just make my own tool. I think I ended up making a program that is easy-to-use tool and can be applied to a variety of Rust libraries so I am now publishing it for the use by any Rust developer.
 
-##### I want to hear from you! Please fill out a repository issue with any questions, problems, or suggestions!
+#### I want to hear from you! Please fill out a repository issue with any questions, problems, or suggestions!
 ---
 ### Example Library Output
 A panic-list example library (plel) is included in this source [here](examples/lib/src/lib.rs) and it is used to help demonstrate the capabilities of this tool and show what CAN be done for some typical operations in order to create a panic-free version. [Cargo command aliases](.cargo/config.toml) were executed to generate the following example panic-list outputs for different configurations of the plel library.
 
+<br>
 No Rust standard library `#![no_std]` and overflows WILL panic:
 <details>
 <summary><code>cargo print-panic-list-for-example-lib-no-std</code></summary>
@@ -64,8 +65,7 @@ plel::possible::div
       core::panicking::panic_fmt
         rust_begin_unwind
 ```
-</details>
-
+</details><br>
 Include Rust Standard Library (std) and overflows DO NOT panic:
 <details>
 <summary><code>cargo write-panic-list-for-example-lib</code></summary>
@@ -144,6 +144,7 @@ plel::print_hello_world
 </details>
 Notice all of the possible panics that occur by calling Rust's std::println! macro.
 
+<br>
 Note that because of the feature limitation explained above the `-C` flag should be added when executing either of these commands if the other command was run previously.
 ```
 cargo print-panic-list-for-example-lib-no-std
@@ -151,6 +152,9 @@ cargo print-panic-list-for-example-lib-no-default
 ```
 
 ### Rust Library Test Outputs
+Some basic Rust library tests with this tool:
+
+<br>
 Current demangle panic-list feature [dependency](https://github.com/rust-lang/rustc-demangle):
 <details>
 <summary><code>panic-list rustc-demangle</code></summary>
@@ -161,6 +165,7 @@ No panics found! Create a staticlib library output to analyze for true panic-fre
 </details>
 Supposedly no-panics
 
+<br>
 Popular Data Structures Library: [Hasbrown](https://github.com/rust-lang/hashbrown) (commit b5b0655 | tested on 2025-3-11)
 <details>
 <summary><code>panic-list hasbrown</code></summary>
@@ -173,6 +178,7 @@ hashbrown::raw::Fallibility::capacity_overflow
 </details>
 This seems to indicate that for a release version of default-featured hashbrown there is ONE panic call that keeps the whole panic handler system in the code...
 
+<br>
 Popular Data Encoding Library: [base64 v0.22.1](https://github.com/marshallpierce/rust-base64/tree/v0.22.1)
 <details>
 <summary><code>panic-list base64</code></summary>
@@ -206,6 +212,7 @@ base64::alphabet::Alphabet::as_str
 </details>
 Could manually ensure that slice indices are not out of bounds and propagate an error up to remove some of the panics.
 
+<br>
 Note that most release profiles are compiled to NOT panic on overflow cutting out list-able panics and creates undesigned behavior /potential bugs if overflow ends up occurring.
 
 ---
