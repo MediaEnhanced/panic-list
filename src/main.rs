@@ -22,13 +22,32 @@ fn get_ext_paths(dir: &str, ext_str: &str) -> Result<Vec<path::PathBuf>, Box<dyn
     Ok(paths)
 }
 
+/// Generated Callgraph Constants:
+#[cfg(target_os = "windows")]
+const NODE_COMPARISON_LENGTH: usize = 11;
+#[cfg(target_os = "macos")]
+const NODE_COMPARISON_LENGTH: usize = 12;
+#[cfg(target_os = "linux")]
+const NODE_COMPARISON_LENGTH: usize = 12;
+
+const NODE_PREFIX: usize = 6;
+const NODE_LENGTH: usize = NODE_COMPARISON_LENGTH + NODE_PREFIX;
+const SYMBOL_PREFIX: usize = 22;
+const SYMBOL_TO_NODE: usize = SYMBOL_PREFIX + 1 + NODE_COMPARISON_LENGTH;
+const POINT_LENGTH: usize = 4;
+const CARROT_LENGTH_FORWARD: usize = 2;
+const CARROT_LENGTH_BACKWARDS: usize = POINT_LENGTH - CARROT_LENGTH_FORWARD;
+const PREV_CARROT_LENGTH: usize = NODE_PREFIX + CARROT_LENGTH_BACKWARDS;
+
 /// Extract Node of rust_begin_unwind
-fn extract_node_root(data: &[u8]) -> Option<[u8; 11]> {
+fn extract_node_from_root(data: &[u8]) -> Option<[u8; NODE_COMPARISON_LENGTH]> {
     let search = b"rust_begin_unwind";
     for i in 0..=(data.len() - search.len()) {
         if data[i..].starts_with(search) {
-            let mut node = [0; 11];
-            node.copy_from_slice(&data[(i - 34)..(i - 34 + 11)]);
+            let mut node = [0; NODE_COMPARISON_LENGTH];
+            node.copy_from_slice(
+                &data[(i - SYMBOL_TO_NODE)..(i - SYMBOL_TO_NODE + NODE_COMPARISON_LENGTH)],
+            );
             return Some(node);
         }
     }
@@ -36,11 +55,13 @@ fn extract_node_root(data: &[u8]) -> Option<[u8; 11]> {
 }
 
 /// Extract Node of search data
-fn extract_node_name(data: &[u8], search_data: &[u8]) -> Option<[u8; 11]> {
-    for i in 0..=(data.len() - (search_data.len() + 1)) {
-        if data[i] == b'{' && data[(i + 1)..].starts_with(search_data) {
-            let mut node = [0; 11];
-            node.copy_from_slice(&data[(i - 33)..(i - 33 + 11)]);
+fn extract_node_from_name(data: &[u8], name_search: &[u8]) -> Option<[u8; NODE_COMPARISON_LENGTH]> {
+    for i in 0..=(data.len() - (name_search.len() + 1)) {
+        if data[i] == b'{' && data[(i + 1)..].starts_with(name_search) {
+            let mut node = [0; NODE_COMPARISON_LENGTH];
+            node.copy_from_slice(
+                &data[(i - SYMBOL_TO_NODE + 1)..(i - SYMBOL_TO_NODE + 1 + NODE_COMPARISON_LENGTH)],
+            );
             return Some(node);
         }
     }
@@ -48,19 +69,24 @@ fn extract_node_name(data: &[u8], search_data: &[u8]) -> Option<[u8; 11]> {
 }
 
 /// Extract Node of rust_begin_unwind
-fn remove_downstream(data: &mut [u8], node: [u8; 11]) {
+fn remove_downstream(data: &mut [u8], node: [u8; NODE_COMPARISON_LENGTH]) {
     for i in 0..=(data.len() - node.len()) {
-        if data[i..].starts_with(&node) && data[i + 13] == b'>' {
-            data[i + 13] = b'-';
+        if data[i..].starts_with(&node)
+            && data[i + NODE_COMPARISON_LENGTH + CARROT_LENGTH_FORWARD] == b'>'
+        {
+            data[i + NODE_COMPARISON_LENGTH + CARROT_LENGTH_FORWARD] = b'-';
         }
     }
 }
 
 /// Store Node Name into vector data
-fn store_node_name(data: &[u8], node: [u8; 11], out_data: &mut Vec<u8>) {
+fn store_node_name(data: &[u8], node: [u8; NODE_COMPARISON_LENGTH], out_data: &mut Vec<u8>) {
     for i in 0..=(data.len() - node.len()) {
-        if data[i..].starts_with(&node) && data[i - 8] != b'>' && data[i + 33] == b'{' {
-            let name_start = i + 34;
+        if data[i..].starts_with(&node)
+            && data[i - PREV_CARROT_LENGTH] != b'>'
+            && data[i + SYMBOL_TO_NODE - 1] == b'{'
+        {
+            let name_start = i + SYMBOL_TO_NODE;
             let mut name_end = name_start;
             for (j, b) in data.iter().enumerate().skip(name_start) {
                 if *b == b'}' {
@@ -101,10 +127,10 @@ fn store_node_name(data: &[u8], node: [u8; 11], out_data: &mut Vec<u8>) {
 /// Get Previous Nodes and Store the names into vector data
 fn get_prev_nodes(
     data: &[u8],
-    root_node: [u8; 11],
-    top_level_nodes: &[[u8; 11]],
+    root_node: [u8; NODE_COMPARISON_LENGTH],
+    top_level_nodes: &[[u8; NODE_COMPARISON_LENGTH]],
     out_data: &mut Vec<u8>,
-    node: [u8; 11],
+    node: [u8; NODE_COMPARISON_LENGTH],
     depth: usize,
 ) -> usize {
     for tln in top_level_nodes {
@@ -116,9 +142,12 @@ fn get_prev_nodes(
     if depth > 0 {
         let mut tab = 0;
         for i in 0..=(data.len() - node.len()) {
-            if data[i..].starts_with(&node) && data[i - 8] == b'>' {
-                let mut prev_node = [0; 11];
-                prev_node.copy_from_slice(&data[(i - 21)..(i - 21 + 11)]);
+            if data[i..].starts_with(&node) && data[i - PREV_CARROT_LENGTH] == b'>' {
+                let mut prev_node = [0; NODE_COMPARISON_LENGTH];
+                prev_node.copy_from_slice(
+                    &data[(i - NODE_LENGTH - POINT_LENGTH)
+                        ..(i - NODE_LENGTH - POINT_LENGTH + NODE_COMPARISON_LENGTH)],
+                );
                 // Basic Recursive Check (But Needs something different)
                 if prev_node != node || prev_node != root_node {
                     let new_tab = get_prev_nodes(
@@ -163,7 +192,7 @@ struct ProgramArgs {
     no_default_feat: bool,
 
     #[bpaf(short('f'), long, argument::<String>("LIST"), fallback(String::new()))]
-    /// Turn on features of the libarary.
+    /// Turn on features of the library.
     /// Use a space or comma separated list.
     features: String,
 
@@ -394,13 +423,13 @@ fn main() -> Result<(), std::io::Error> {
     // remove root node downstream elements to prevent some forms of recursion,
     // and store the top level nodes and their paths that make it to the root node.
     let mut out_data = vec![];
-    if let Some(root_node) = extract_node_root(&callgraph_data) {
-        println!("Generating the panic-list!");
+    if let Some(root_node) = extract_node_from_root(&callgraph_data) {
+        println!("Generating the panic-list! {:?}", root_node);
         let mut node_name = Vec::new();
         let mut top_level_nodes = Vec::new();
         for b in symbol_bytes.as_mut_slice() {
             if *b == b'\n' {
-                if let Some(n) = extract_node_name(&callgraph_data, &node_name) {
+                if let Some(n) = extract_node_from_name(&callgraph_data, &node_name) {
                     if n != root_node {
                         top_level_nodes.push(n);
                     }

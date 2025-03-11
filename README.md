@@ -146,6 +146,7 @@ Notice all of the possible panics that occur by calling Rust's std::println! mac
 
 <br>
 Note that because of the feature limitation explained above the `-C` flag should be added when executing either of these commands if the other command was run previously.
+
 ```
 cargo print-panic-list-for-example-lib-no-std
 cargo print-panic-list-for-example-lib-no-default
