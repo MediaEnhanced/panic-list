@@ -331,10 +331,11 @@ fn main() -> Result<(), std::io::Error> {
     // Create a symbol list in byte form for all .bc files rustc generated that start with the target package name
     // This is not bullet proof and will probably need adjusting.
     let mut symbol_bytes = Vec::new();
+    let package_name_update = pargs.package_name.replace("-", "_");
     let bc_file_paths = get_ext_paths(&dir_str, "bc").unwrap();
     for p in &bc_file_paths {
         let file_name = p.file_name().unwrap().to_str().unwrap();
-        if file_name.starts_with(pargs.package_name.as_str()) {
+        if file_name.starts_with(package_name_update.as_str()) {
             command_output = process::Command::new("llvm-nm")
                 .args(["--defined-only", "--extern-only", "--format=just-symbols"])
                 .arg(p.as_path())
@@ -424,7 +425,7 @@ fn main() -> Result<(), std::io::Error> {
     // and store the top level nodes and their paths that make it to the root node.
     let mut out_data = vec![];
     if let Some(root_node) = extract_node_from_root(&callgraph_data) {
-        println!("Generating the panic-list! {:?}", root_node);
+        println!("Generating the panic-list!");
         let mut node_name = Vec::new();
         let mut top_level_nodes = Vec::new();
         for b in symbol_bytes.as_mut_slice() {
