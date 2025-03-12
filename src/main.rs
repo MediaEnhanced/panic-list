@@ -178,6 +178,41 @@ fn get_prev_nodes(
     }
 }
 
+// /// Get Previous Nodes and Store the names into vector data
+// fn get_prev_nodes2(
+//     data: &[u8],
+//     node: [u8; NODE_COMPARISON_LENGTH],
+//     depth: usize,
+//     out_data: &mut Vec<u8>,
+// ) {
+//     for _i in 0..depth {
+//         out_data.extend_from_slice(b"  ");
+//     }
+//     store_node_name(data, node, out_data);
+//     if depth < 20 {
+//         for i in 0..=(data.len() - node.len()) {
+//             if data[i..].starts_with(&node) && data[i - 8] == b'>' {
+//                 let mut prev_node = [0; NODE_COMPARISON_LENGTH];
+//                 prev_node.copy_from_slice(
+//                     &data[(i - NODE_LENGTH - POINT_LENGTH)
+//                         ..(i - NODE_LENGTH - POINT_LENGTH + NODE_COMPARISON_LENGTH)],
+//                 );
+//                 // Basic Recursive Check (But Needs something different)
+//                 if prev_node != node {
+//                     get_prev_nodes2(data, prev_node, depth + 1, out_data);
+//                 }
+//             }
+//         }
+//     }
+// }
+
+const PANIC_HANDLER_FILE: &str = "#![no_std]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+";
+
 /// panic-list Program Arguments:
 #[derive(Clone, Debug, bpaf::Bpaf)]
 #[bpaf(options, version)]
@@ -213,7 +248,7 @@ struct ProgramArgs {
     /// Clean-up temporary files before panic-list generation.
     should_clean: bool,
 
-    #[bpaf(long, argument::<usize>("INT"), fallback(10))]
+    #[bpaf(long, argument::<usize>("INT"), fallback(16))]
     /// Specify the max recursive depth of the panic callgraph analysis.
     recursive_depth: usize,
 
@@ -287,6 +322,7 @@ fn main() -> Result<(), std::io::Error> {
     } else {
         cargo_command.arg("build-std=core");
     }
+    cargo_command.args(["-Z", "build-std-features=compiler-builtins-mem"]);
     // Tell rustc the specific package name. Mostly useful for a workspace Cargo
     if pargs.in_workspace {
         cargo_command
@@ -355,9 +391,9 @@ fn main() -> Result<(), std::io::Error> {
     // Create the LTO output files with a basic optimization pass of 1 (might need changing)
     let mut output_file = dir_str.clone();
     output_file.push_str("lto.o");
-    let mut llvm_lto = process::Command::new("llvm-lto");
-    llvm_lto
-        .args(["-O1", "--save-merged-module", "-o"]) //--save-linked-module
+    let mut llvm_lto_args = process::Command::new("llvm-lto-args");
+    llvm_lto_args
+        .args(["--save-merged-module", "-o"]) //--save-linked-module
         .arg(output_file.as_str());
 
     // Add all the exported symbols using previous llvm-nm commands
@@ -365,7 +401,7 @@ fn main() -> Result<(), std::io::Error> {
     let symbol_name_start = symbol_name.len();
     for b in symbol_bytes.as_mut_slice() {
         if *b == b'\n' {
-            llvm_lto.arg(str::from_utf8(&symbol_name).unwrap());
+            llvm_lto_args.arg(str::from_utf8(&symbol_name).unwrap());
             symbol_name.truncate(symbol_name_start);
         } else {
             symbol_name.push(*b);
@@ -375,20 +411,26 @@ fn main() -> Result<(), std::io::Error> {
     // Add all valid .bc files as arguments for the lto command
     for p in &bc_file_paths {
         let file_name = p.file_name().unwrap().to_str().unwrap();
-        if file_name.starts_with("lto.o") || file_name.starts_with("panic_unwind") {
+        if file_name.starts_with("lto.o")
+            || file_name.starts_with("panic_unwind")
+            || file_name.starts_with("rustc_demangle")
+            || file_name.starts_with("panic_handler.bc")
+        // || file_name.starts_with("unwind")
+        {
             continue;
         }
-        llvm_lto.arg(p.as_path());
+        llvm_lto_args.arg(p.as_path());
     }
 
     // Execute the LTO command
     println!("Running LTO Command!");
-    let res = llvm_lto.output().expect("LLVM LTO Command Failure");
+    let res = process::Command::new("llvm-lto")
+        .arg("-O1")
+        .args(llvm_lto_args.get_args())
+        .output()
+        .expect("LLVM LTO Command Failure");
     if !res.status.success() {
-        println!(
-            "llvm LTO Error: {}",
-            str::from_utf8(&command_output.stderr).unwrap()
-        );
+        println!("llvm LTO Error: {}", str::from_utf8(&res.stderr).unwrap());
         return Ok(());
     }
     if pargs.verbose {
@@ -405,10 +447,7 @@ fn main() -> Result<(), std::io::Error> {
         .output()
         .expect("LLVM opt Command Failure");
     if !res.status.success() {
-        println!(
-            "opt Error: {}",
-            str::from_utf8(&command_output.stderr).unwrap()
-        );
+        println!("opt Error: {}", str::from_utf8(&res.stderr).unwrap());
         return Ok(());
     }
     if pargs.verbose {
@@ -426,6 +465,24 @@ fn main() -> Result<(), std::io::Error> {
     let mut out_data = vec![];
     if let Some(root_node) = extract_node_from_root(&callgraph_data) {
         println!("Generating the panic-list!");
+        // Removing the following downstream nodes helps to alleviate panic recursive problems
+        // when the std bitcode was a part of the lto process.
+        remove_downstream(&mut callgraph_data, root_node);
+        if let Some(n) = extract_node_from_name(&callgraph_data, b"_ZN4core3str16slice_error_fail")
+        {
+            remove_downstream(&mut callgraph_data, n);
+        }
+        if let Some(n) =
+            extract_node_from_name(&callgraph_data, b"_ZN4core9panicking14panic_nounwind")
+        {
+            remove_downstream(&mut callgraph_data, n);
+        }
+
+        // get_prev_nodes2(&callgraph_data, root_node, 0, &mut out_data);
+        // fs::write("panic-list2.txt", &out_data).unwrap();
+        // // return Ok(());
+        // out_data.clear();
+
         let mut node_name = Vec::new();
         let mut top_level_nodes = Vec::new();
         for b in symbol_bytes.as_mut_slice() {
@@ -457,15 +514,118 @@ fn main() -> Result<(), std::io::Error> {
             pargs.recursive_depth,
         );
     } else {
-        println!("Cannot find rust_begin_unwind symbol!");
+        println!(
+            "Could not find panic-handler rust_begin_unwind symbol. Library should be panic-free!\nNo panic-list text files have been modified."
+        );
         return Ok(());
     }
 
     // If output data is empty there are no panics in the library!
     if out_data.is_empty() {
-        println!(
-            "No panics found! Create a staticlib library output to analyze for true panic-freeness."
-        );
+        println!("No paths from the panic-handler found to any top-level library functions.");
+
+        if !pargs.only_core {
+            // panic handler can be overriden to give lto a better chance of taking out since it is
+            // "recursive" from within the generated llvm std bitcode.
+            println!("Creating panic_handler override bitcode!");
+            let mut out_file_path_str = dir_str.clone();
+            out_file_path_str.push_str("panic_handler.rs");
+            fs::write(out_file_path_str.as_str(), PANIC_HANDLER_FILE).unwrap();
+
+            let mut in_file_path_str = String::from("--emit=llvm-bc=");
+            in_file_path_str.push_str(&dir_str);
+            in_file_path_str.push_str("panic_handler.bc");
+            let rustc_res = process::Command::new("rustc")
+                .arg(out_file_path_str)
+                .args(["--edition", "2024", "--crate-type=rlib"])
+                .arg(in_file_path_str.as_str())
+                .output()
+                .expect("rustc Error");
+            if !rustc_res.status.success() {
+                println!(
+                    "Plain rustc Error: {}",
+                    str::from_utf8(&rustc_res.stderr).unwrap()
+                );
+                return Ok(());
+            }
+            if pargs.verbose {
+                println!(
+                    "rustc Print: {}",
+                    str::from_utf8(&rustc_res.stderr).unwrap()
+                );
+            }
+
+            for p in &bc_file_paths {
+                let file_name = p.file_name().unwrap().to_str().unwrap();
+                if file_name.starts_with("std-") {
+                    println!("Overriding the panic_handler in the std bitcode!");
+                    let mut in_file_path_str = String::from("--override=");
+                    in_file_path_str.push_str(&dir_str);
+                    in_file_path_str.push_str("panic_handler.bc");
+
+                    let link_res = process::Command::new("llvm-link")
+                        .arg(in_file_path_str)
+                        .arg("-o")
+                        .arg(p.as_path())
+                        .arg(p.as_path())
+                        .output()
+                        .expect("LLVM link Error");
+                    if !link_res.status.success() {
+                        println!(
+                            "LLVM link Error: {}",
+                            str::from_utf8(&link_res.stderr).unwrap()
+                        );
+                        return Ok(());
+                    }
+                    if pargs.verbose {
+                        println!("Link Print: {}", str::from_utf8(&link_res.stderr).unwrap());
+                    }
+                    break;
+                }
+            }
+        }
+
+        println!("Testing again with more LTO optimization!");
+        //println!("Running LTO Command Again!");
+        let res = process::Command::new("llvm-lto")
+            .arg("-O3")
+            .args(llvm_lto_args.get_args())
+            .output()
+            .expect("LLVM LTO Command Failure");
+        if !res.status.success() {
+            println!("llvm LTO Error: {}", str::from_utf8(&res.stderr).unwrap());
+            return Ok(());
+        }
+        if pargs.verbose {
+            println!("LTO Print: {}", str::from_utf8(&res.stderr).unwrap());
+        }
+
+        // Create the Callgraph using the generated LTO merged file
+        let mut output_file = dir_str.clone();
+        output_file.push_str("lto.o.merged.bc");
+        println!("Running Opt Callgraph Command Again!");
+        let res = process::Command::new("opt")
+            .args(["-disable-output", "-passes=dot-callgraph"])
+            .arg(output_file.as_str())
+            .output()
+            .expect("LLVM opt Command Failure");
+        if !res.status.success() {
+            println!("opt Error: {}", str::from_utf8(&res.stderr).unwrap());
+            return Ok(());
+        }
+        if pargs.verbose {
+            println!("opt Print: {}", str::from_utf8(&res.stderr).unwrap());
+        }
+
+        let callgraph_data = fs::read(callgraph_file.as_str()).unwrap();
+        if extract_node_from_root(&callgraph_data).is_none() {
+            println!(
+                "Could not find panic-handler rust_begin_unwind symbol. Library should be panic-free!\nNo panic-list text files have been modified."
+            );
+            return Ok(());
+        } else {
+            println!("Print Handler Still Exists. Library might not be panic-free!");
+        }
     }
 
     // Print output data to terminal and files based on program arguments

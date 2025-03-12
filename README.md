@@ -4,7 +4,7 @@ This tool is executed on Rust library crates in order to generate a list of libr
 Rust libraries usually panic due to either program bugs or missuse by the user application. A more stable and reliable Rust library should never panic and using this tool can help achieve that goal. Analyzing panic function paths can lead to bug discovery (and then elimination) or errors that are recoverable and should be propagated up to the library user.
 
 ### How to Use
-The [LLVM Software Binaries](https://github.com/llvm/llvm-project/releases) must be installed on the path. This project currently requires the `llvm-nm`, `llvm-lto`, and `opt` programs that should be included in the release packages.
+The [LLVM Software Binaries](https://github.com/llvm/llvm-project/releases) must be installed on the path. This project currently requires the `llvm-nm`, `llvm-link`, `llvm-lto`, and `opt` programs that should be included in the release packages.
 
 Nightly Rust is also required for generating the complete panic analysis but it might not be a hard requirement in the future (probably with a different cost). It can be added by running:
 
