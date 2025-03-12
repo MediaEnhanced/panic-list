@@ -430,7 +430,12 @@ fn main() -> Result<(), std::io::Error> {
         let mut top_level_nodes = Vec::new();
         for b in symbol_bytes.as_mut_slice() {
             if *b == b'\n' {
-                if let Some(n) = extract_node_from_name(&callgraph_data, &node_name) {
+                // Account for macOS Double Underscore Symbol Naming
+                #[cfg(not(target_os = "macos"))]
+                let name_search = &node_name;
+                #[cfg(target_os = "macos")]
+                let name_search = &node_name[1..];
+                if let Some(n) = extract_node_from_name(&callgraph_data, name_search) {
                     if n != root_node {
                         top_level_nodes.push(n);
                     }
